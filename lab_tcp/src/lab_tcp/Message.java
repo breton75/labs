@@ -13,7 +13,7 @@ import java.io.Serializable;
  *
  * @author user
  */
-public class Message implements Serializable {
+public class Message extends Object implements Serializable {
     
     private String message;
     private String user;
@@ -23,11 +23,27 @@ public class Message implements Serializable {
         this.user = user;
     }
 
+    public Message() {
+        this("", "");
+    }
+    
     public Message(Message other) {
         this.message = other.message;
         this.user = other.user;
     }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public void setUser(String user) {
+        this.user = user;
+    }
     
+    public void set(Message m) {
+        this.message = m.message;
+        this.user = m.user;
+    }
     
     public String getMessage() {
         return message;

@@ -14,8 +14,8 @@ public class Client implements AutoCloseable {
 
     private Scanner scanner;
     private Socket socket;
-    private ObjectOutputStream output;
-    private ObjectInputStream input;
+//    private ObjectOutputStream output;
+//    private ObjectInputStream input;
 
     private Client(InetAddress address, int port) throws IOException {
         scanner = new Scanner(System.in);
@@ -31,29 +31,57 @@ public class Client implements AutoCloseable {
 
     public static void main(String[] args) {
         
-        while(true) {
             
             try (Client client = new Client(InetAddress.getLoopbackAddress(), Server.LISTEN_PORT);
                  ObjectOutputStream output = new ObjectOutputStream(client.socket.getOutputStream());
                  ObjectInputStream input = new ObjectInputStream(client.socket.getInputStream()))
                 {
+                    boolean logged = false;
+                    
+                    // получаем запрс сервера на логон
+                    Message m1 = (Message) input.readObject();
+                    System.out.println(m1.toString());
+                    
+                    String current_user = "";                                    
+                    
+                    if(m1.getUser().equalsIgnoreCase("server") &&
+                       m1.getMessage().equalsIgnoreCase(Server.Operations.LOGON.toString())) {
+                        
+                        // данное имя пользователя будет использоваться во всех дальнейших сообщениях
+                        current_user = client.scanner.nextLine();
+                        
+                        output.writeObject(new Message(current_user, Server.Operations.LOGON.toString()));
+                        output.flush();
+                        
+                        // ждем результат авторизации
+                        Message m2 = (Message) input.readObject();
+                        System.out.println(m2.toString());
+                        
+                        logged = m2.getMessage().equalsIgnoreCase("OK");
+                            
+                    }
+                    
+                    while(logged) {
+                        
+                        output.writeObject(new Message(current_user, client.scanner.nextLine()));
+                        output.flush();
+                        
+                        Message m3 = (Message)input.readObject();
+                        System.out.println(m3.toString());
+                        
+                        logged = !m3.getMessage().equalsIgnoreCase(Server.Operations.EXIT.toString());
+                        
+                    }
 
-    System.out.println("1");
-    //                ObjectInputStream input = new ObjectInputStream(client.socket.getInputStream());
-                    Message m = new Message((Message) input.readObject());
-                    System.out.println("2");
-                    System.out.println(m.toString());
 
-    //                ObjectOutputStream output = new ObjectOutputStream(client.socket.getOutputStream());
-                    output.writeObject(new Message("admin", client.scanner.nextLine()));
-
-    //            }
-
+                    client.close();
+                    
             } catch (Exception ex) {
+                
                 System.err.println(ex.getMessage());
             }
             
-        }
+        
             
 //        } catch (ClassNotFoundException | IOException ex) {
 //            ex.printStackTrace();
