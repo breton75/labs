@@ -9,9 +9,9 @@ import java.net.Socket;
 //import java.net.SocketException;
 import java.util.ArrayList;
 //import java.util.Arrays;
-//import java.util.Date;
+import java.util.Date;
 //import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
+//import java.util.concurrent.ConcurrentHashMap;
 //import java.util.concurrent.ConcurrentMap;
 //import java.util.concurrent.ConcurrentSkipListSet;
 
@@ -21,20 +21,24 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Server implements AutoCloseable {
 
-    public enum Operations { LOGON, EXIT }
+    public enum Operations { LOGIN, DATE, REG, EXIT, CLOSE }
 
     static final int LISTEN_PORT = 12345;
 
     private ServerSocket socket;
 
-    private ConcurrentHashMap<String, ArrayList<String>> history;
+//    private ConcurrentHashMap<String, ArrayList<String>> history;
+    private ArrayList<String> logins;
+    private ArrayList<Registration> registration;
 
     private Server(int port) throws IOException {
         
         try {
             
             socket = new ServerSocket(port);
-            history = new ConcurrentHashMap<String, ArrayList<String>>();
+//            history = new ConcurrentHashMap<String, ArrayList<String>>();
+            logins = new ArrayList<>();
+            registration = new ArrayList<>();
             
         }
         
@@ -54,7 +58,7 @@ public class Server implements AutoCloseable {
                 ObjectInputStream input = new ObjectInputStream(socket.getInputStream());)
             {
                 // в самом начале после подключения клиента, сервер отправляет запрос на логин
-                output.writeObject(new Message("server", Operations.LOGON.toString()));
+                output.writeObject(new Message("server", Operations.LOGIN.toString()));
                 output.flush();
                 
                 // ждем ответа клиента с логином
@@ -66,12 +70,13 @@ public class Server implements AutoCloseable {
                 try {
                     
                     // в первом сообщении клиент присылает свое имя.
-                    if(current_message.equalsIgnoreCase(Operations.LOGON.toString())) {
+                    if(current_message.equalsIgnoreCase(Operations.LOGIN.toString())) {
 
                         // есть ли в истории такой пользователь
-                        if(!history.containsKey(current_user)) {
+                        if(!logins.contains(current_user)) {
 
-                            history.put(current_user, new ArrayList<String>());
+                            logins.add(current_user);
+                            registration.add(new Registration(new Date(), current_user));
                             
                             System.out.println(current_user + " logged in.");
                             
@@ -102,24 +107,44 @@ public class Server implements AutoCloseable {
                     
                     try {
 
-                        // ждем ответа клиента с логином
+                        // ждем запрос от клиента
                         Message m = (Message) input.readObject();
                         System.out.println(m.toString());
                         
-                        if(m.getMessage().equalsIgnoreCase(Operations.EXIT.toString())) {
+                        if(m.getMessage().equalsIgnoreCase(Operations.EXIT.toString()) ||
+                                m.getMessage().equalsIgnoreCase(Operations.CLOSE.toString())) {
 
-                            output.writeObject(new Message("server", Operations.EXIT.toString()));
+                            output.writeObject(new Message("server", m.getMessage().toUpperCase()));
                             output.flush();
-                                
-                            history.get(m.getUser()).clear();
-                            history.remove(m.getUser());
+                            
+                            logins.remove(m.getUser());
                             
                             System.out.println(current_user + " logged out.");
                             
                             socket.close();
                             break;
                             
-                        }else {
+                        } else if(m.getMessage().equalsIgnoreCase(Operations.DATE.toString())) {
+
+                            output.writeObject(new Message("server", "Current Date/Time: " + new Date().toString()));
+                            output.flush();
+                            
+                            System.out.println(Operations.DATE.toString());                            
+                            
+                        } else if (m.getMessage().equalsIgnoreCase(Operations.REG.toString())) {
+                            
+                            String registration_list = "Registration history for " + current_user + ":\n";
+                            for(Registration r : registration)
+                                if(r.getUser().equalsIgnoreCase(current_user))
+                                    registration_list += r.getDate().toString() + '\n';
+                            
+                            output.writeObject(new Message("server", registration_list));
+                            output.flush();
+                            
+                            System.out.println(Operations.REG.toString());   
+                            
+                        }        
+                        else {
                             output.writeObject(new Message("server", m.toString() + ": OK"));  
                             output.flush();
                                 
@@ -158,8 +183,6 @@ public class Server implements AutoCloseable {
     public void close() throws Exception {
         if(socket != null && !socket.isClosed())
             socket.close();
-        
-//        if(server != null && !server.isClosed())
-//            server.close();
+
     }
 }

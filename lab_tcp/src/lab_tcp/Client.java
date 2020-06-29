@@ -31,12 +31,14 @@ public class Client implements AutoCloseable {
 
     public static void main(String[] args) {
         
+        while(true) {
             
             try (Client client = new Client(InetAddress.getLoopbackAddress(), Server.LISTEN_PORT);
                  ObjectOutputStream output = new ObjectOutputStream(client.socket.getOutputStream());
                  ObjectInputStream input = new ObjectInputStream(client.socket.getInputStream()))
                 {
                     boolean logged = false;
+                    boolean closed = false;
                     
                     // получаем запрс сервера на логон
                     Message m1 = (Message) input.readObject();
@@ -45,12 +47,12 @@ public class Client implements AutoCloseable {
                     String current_user = "";                                    
                     
                     if(m1.getUser().equalsIgnoreCase("server") &&
-                       m1.getMessage().equalsIgnoreCase(Server.Operations.LOGON.toString())) {
+                       m1.getMessage().equalsIgnoreCase(Server.Operations.LOGIN.toString())) {
                         
                         // данное имя пользователя будет использоваться во всех дальнейших сообщениях
                         current_user = client.scanner.nextLine();
                         
-                        output.writeObject(new Message(current_user, Server.Operations.LOGON.toString()));
+                        output.writeObject(new Message(current_user, Server.Operations.LOGIN.toString()));
                         output.flush();
                         
                         // ждем результат авторизации
@@ -61,7 +63,7 @@ public class Client implements AutoCloseable {
                             
                     }
                     
-                    while(logged) {
+                    while(logged && !closed) {
                         
                         output.writeObject(new Message(current_user, client.scanner.nextLine()));
                         output.flush();
@@ -70,16 +72,19 @@ public class Client implements AutoCloseable {
                         System.out.println(m3.toString());
                         
                         logged = !m3.getMessage().equalsIgnoreCase(Server.Operations.EXIT.toString());
-                        
+                        closed = m3.getMessage().equalsIgnoreCase(Server.Operations.CLOSE.toString());
                     }
 
-
                     client.close();
+                    
+                    if(closed)
+                        break;
                     
             } catch (Exception ex) {
                 
                 System.err.println(ex.getMessage());
             }
+        }
             
         
             
